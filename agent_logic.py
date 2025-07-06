@@ -78,6 +78,8 @@ def qualify_lead_with_ai(company_name: str, description: str) -> dict:
             temperature=0.0, # Keep AI responses deterministic for consistent qualification results
         )
         ai_response_str = chat_completion.choices[0].message.content
+        if ai_response_str is None:
+            raise ValueError("No response content received from Groq API")
         ai_data = json.loads(ai_response_str) # Parse the JSON string into a Python dictionary
 
         # Basic validation to ensure expected keys and types
