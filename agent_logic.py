@@ -124,13 +124,13 @@ lead_protocol = Protocol(name="lead_qualification", version="1.0")
 # --- Function to be Called from Streamlit (`app.py`) ---
 # This function simulates our agent processing a single lead.
 # It will call the AI qualification logic and also conceptually demonstrate Coral Protocol message sending.
-def process_single_lead_with_agent(company_name: str, description: str, lead_id: str):
+def process_single_lead_with_agent(company: str, description: str, lead_id: str):
     """
     Simulates a Sales Qualifier Agent processing a single lead.
     Includes AI qualification and a conceptual demonstration of Coral Protocol usage.
     """
     # Step 1: Agent performs reasoning and action by calling the AI
-    ai_result = qualify_lead_with_ai(company_name, description)
+    ai_result = qualify_lead_with_ai(company, description)
 
     # Step 2: Conceptual Coral Protocol usage for logging or inter-agent communication
     # In a full multi-agent system (like a deployed Fetch.ai network),
@@ -138,7 +138,7 @@ def process_single_lead_with_agent(company_name: str, description: str, lead_id:
     # via the defined protocol (e.g., to a logging agent, or a CRM integration agent).
     # For this solo hackathon MVP within Streamlit, simply logging the structured message
     # demonstrates compliance with Coral Protocol usage.
-    log_message_content = f"LumiNova AI Agent processed lead '{company_name}': Status={ai_result.get('qualified_status')}, Priority={ai_result.get('priority_score')}"
+    log_message_content = f"LumiNova AI Agent processed lead '{company}': Status={ai_result.get('qualified_status')}, Priority={ai_result.get('priority_score')}"
     print(f"Fetch.ai/Coral Protocol (Simulation): {log_message_content}")
     # If we were running a full Fetch.ai AGI, we might do:
     # await ctx.send(LOGGER_AGENT_ADDRESS, LogMessage(log_content=log_message_content))

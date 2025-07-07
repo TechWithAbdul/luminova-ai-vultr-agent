@@ -10,6 +10,7 @@ import uuid
 import plotly.express as px
 import time
 from datetime import datetime
+import numpy as np
 
 # Firebase Admin SDK Imports
 import firebase_admin
@@ -20,13 +21,6 @@ try:
     from agent_logic import process_single_lead_with_agent
 except ImportError:
     st.error("Error: agent_logic.py not found. Please ensure it's in the same directory.")
-    # Define a dummy function to allow app to run for UI testing
-    def process_single_lead_with_agent(company, description, lead_id):
-        return {
-            "qualified_status": "Not Fit",
-            "priority_score": 0,
-            "reasoning": "Agent logic not loaded. Dummy response.",
-        }
 
 
 # Load Environment Variables
@@ -36,7 +30,7 @@ load_dotenv()
 st.set_page_config(
     layout="wide",
     page_title="LumiNova AI: Enterprise Insight Agent",
-    page_icon="🚀",
+    page_icon="💠",
     initial_sidebar_state="expanded"
 )
 
@@ -311,7 +305,6 @@ st.markdown("""
     .download-section p {
         font-size: 1.2rem;
         opacity: 0.95;
-        color: linear-gradient(135deg, #059669 0%, #10b981 100%)
     }
 
     /* Streamlit Widget Overrides */
@@ -607,7 +600,7 @@ col1, col2, col3 = st.columns(3)
 with col1:
     st.markdown("""
     <div class="metric-card">
-        <h3>🎯 Lead Qualification</h3>
+        <h3>🎯Lead Qualification</h3>
         <p>Precise AI-powered lead analysis</p>
     </div>
     """, unsafe_allow_html=True)
@@ -616,15 +609,15 @@ with col2:
     st.markdown("""
     <div class="metric-card">
         <h3>📈 Priority Scoring</h3>
-        <p>Intelligent, actionable prioritization</p>
+        <p>Intelligent  Prioritization</p>
     </div>
     """, unsafe_allow_html=True)
 
 with col3:
     st.markdown("""
     <div class="metric-card">
-        <h3>🧠 Knowledge Graph</h3>
-        <p>Personalized, persistent user learning</p>
+        <h3>🧠Knowledge Graph</h3>
+        <p>Personalized,persistent user learning</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -706,21 +699,34 @@ if not df_original.empty:
             
             high_count = medium_count = low_count = not_fit_count = 0
             
+            # Helper function to safely convert to string, handling NaN, None, pd.NA, Series, NDFrame
+            def safe_str(val):
+                if val is None:
+                    return ""
+                try:
+                    # Handles np.nan, pd.NA, pd.NaT
+                    if pd.isna(val):
+                        return ""
+                except Exception:
+                    pass
+                # If it's a Series or NDFrame, treat as empty
+                if hasattr(val, 'ndim') and val.ndim > 0:
+                    return ""
+                return str(val)
+            
             for idx, (df_index, row) in enumerate(df_original.iterrows()):
-                company = row['Company Name']
-                description = row['Description']
-                lead_id = f"lead_{df_index}"
-                
-                # Convert to strings to avoid potential type errors from pandas (e.g., NaN)
-                company_str = str(company) if pd.notna(company) else ""
-                description_str = str(description) if pd.notna(description) else ""
+                # Fix 2: Use .get() for DataFrame row access to ensure scalar values
+                company_val = row.get('Company Name', "")
+                description_val = row.get('Description', "")
+                company_str = safe_str(company_val)
+                description_str = safe_str(description_val)
                 
                 progress_status_placeholder.markdown(f"**Processing:** <span style='color:#a78bfa;'>{company_str}</span> (Lead {idx + 1} of {total_leads})...", unsafe_allow_html=True)
                 
                 # Add a small delay for visual effect and to prevent overwhelming API (if many leads)
                 # time.sleep(0.05) # Uncomment if you want to slow down for demo
                 
-                result = process_single_lead_with_agent(company_str, description_str, lead_id)
+                result = process_single_lead_with_agent(company_str, description_str, f"lead_{df_index}")
                 
                 # Update counters based on AI result
                 status = result.get("qualified_status", "Not Fit")
@@ -740,8 +746,8 @@ if not df_original.empty:
                 not_fit_metric.metric("Not Fit", str(not_fit_count))
                 
                 processed_leads_data.append({
-                    "Original Company Name": company, # Keep original object for display
-                    "Original Description": description, # Keep original object for display
+                    "Original Company Name": company_str, # Keep original object for display
+                    "Original Description": description_str, # Keep original object for display
                     "Qualified Status": result.get("qualified_status", "N/A"),
                     "Priority Score": result.get("priority_score", 0),
                     "Reasoning": result.get("reasoning", "No reasoning provided")
@@ -750,7 +756,7 @@ if not df_original.empty:
                 # Update user profile in Firebase
                 if user_profile and "past_interactions" in user_profile:
                     user_profile["past_interactions"].append({
-                        "lead_id": lead_id,
+                        "lead_id": f"lead_{df_index}",
                         "company": company_str,
                         "description": description_str,
                         "analysis": result,
@@ -773,12 +779,24 @@ if not df_original.empty:
                     # Re-fetch profile to ensure latest updates are shown
                     updated_profile_for_display = get_user_profile(current_user_id) 
 
+                    # Fix 3: Add None checks before using .get()
+                    if updated_profile_for_display:
+                        total_leads = len(updated_profile_for_display.get("past_interactions", []))
+                        created_at = updated_profile_for_display.get('created_at', 'N/A')[:10]
+                        last_interaction = (
+                            updated_profile_for_display['past_interactions'][-1]['timestamp'][:16].replace('T', ' ')
+                            if updated_profile_for_display.get('past_interactions') else 'N/A'
+                        )
+                    else:
+                        total_leads = 0
+                        created_at = 'N/A'
+                        last_interaction = 'N/A'
                     st.markdown(f"""
                     <div class="user-profile-card">
                         <h4>📊 Activity Statistics</h4> 
-                        <p style="margin: 0.5rem 0;">Total Leads Processed: <strong>{len(updated_profile_for_display.get("past_interactions", []))}</strong></p>
-                        <p style="margin: 0.5rem 0;">Profile Created: <strong>{updated_profile_for_display.get('created_at', 'N/A')[:10]}</strong></p>
-                        <p style="margin: 0.5rem 0;">Last Interaction: <strong>{updated_profile_for_display['past_interactions'][-1]['timestamp'][:16].replace('T', ' ') if updated_profile_for_display and updated_profile_for_display.get('past_interactions') else 'N/A'}</strong></p>
+                        <p style="margin: 0.5rem 0;">Total Leads Processed: <strong>{total_leads}</strong></p>
+                        <p style="margin: 0.5rem 0;">Profile Created: <strong>{created_at}</strong></p>
+                        <p style="margin: 0.5rem 0;">Last Interaction: <strong>{last_interaction}</strong></p>
                     </div>
                     """, unsafe_allow_html=True)
                     with st.expander("👁️ View Raw Knowledge Graph"):
